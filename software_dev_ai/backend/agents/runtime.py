@@ -1,10 +1,23 @@
 from pathlib import Path
-
 from tools.runtime_manager import setup_environment
 
-
 def runtime_agent(state):
+    """
+    Prepare the project's runtime environment.
 
+    The environment configuration is produced by the
+    Environment Agent and contains information such as:
+
+    - language
+    - package manager
+    - environment type
+    - install command
+    - build command
+    - test command
+
+    If environment setup fails, the graph can send the project
+    back to the Coder Agent for another iteration.
+    """
     project_id = state["project_id"]
 
     project_path = (
@@ -13,25 +26,80 @@ def runtime_agent(state):
         / project_id
     )
 
-    environment = state["environment"]
+    environment = state.get("environment", {})
 
-    result = setup_environment(
-        project_path,
-        environment
-    )
+    print("SETTING_UP_RUNTIME")
 
-    if result["exit_code"] == 0:
-        status = "ENVIRONMENT_READY"
-        errors = state.get("errors", [])
-    else:
-        status = "ENVIRONMENT_SETUP_FAILED"
-        errors = state.get("errors", []) + [result["errors"]]
+    # --------------------------------------------------
+    # VALIDATE ENVIRONMENT
+    # --------------------------------------------------
+    if not environment:
+        error_message = (
+            "No environment configuration was provided "
+            "by the Environment Agent."
+        )
 
-    print(f"RUNTIME: {status}")
+        print(f"RUNTIME_FAILED: {error_message}")
+        previous_errors = state.get("errors", [])
 
-    # Return ONLY the keys that changed (LangGraph best practice)
+        return {
+            "runtime_result": {
+                "exit_code": -1,
+                "output": "",
+                "errors": error_message,
+            },
+            "status": "RUNTIME_FAILED",
+            "errors": previous_errors + [error_message],
+        }
+
+    # --------------------------------------------------
+    # SETUP ENVIRONMENT
+    # --------------------------------------------------
+    try:
+        result = setup_environment(
+            project_path,
+            environment
+        )
+
+    except Exception as e:
+        error_message = f"Unexpected runtime setup error: {str(e)}"
+        print(f"RUNTIME_FAILED: {error_message}")
+        previous_errors = state.get("errors", [])
+
+        return {
+            "runtime_result": {
+                "exit_code": -1,
+                "output": "",
+                "errors": error_message,
+            },
+            "status": "RUNTIME_FAILED",
+            "errors": previous_errors + [error_message],
+        }
+
+    # --------------------------------------------------
+    # HANDLE FAILURE
+    # --------------------------------------------------
+    if result.get("exit_code", -1) != 0:
+        error_message = result.get(
+            "errors",
+            "Unknown environment setup error."
+        )
+
+        print(f"RUNTIME_FAILED: {error_message}")
+        previous_errors = state.get("errors", [])
+
+        return {
+            "runtime_result": result,
+            "status": "RUNTIME_FAILED",
+            "errors": previous_errors + [error_message],
+        }
+
+    # --------------------------------------------------
+    # SUCCESS
+    # --------------------------------------------------
+    print("RUNTIME_READY")
+
     return {
         "runtime_result": result,
-        "status": status,
-        "errors": errors,
+        "status": "RUNTIME_READY",
     }

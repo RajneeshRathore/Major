@@ -1,5 +1,5 @@
 from llm.model import llm
-from agents.plan_schema import DevelopmentPlan
+from schemas.plan_schema import DevelopmentPlan
 from rag import store_plan, store_conversation
 
 
