@@ -1,0 +1,12 @@
+langchain
+langchain-core
+langgraph
+langchain-ollama
+python-dotenv
+flask
+flask-cors
+pydantic
+pytest
+chromadb
+flask-sqlalchemy
+langgraph-checkpoint-sqlite
